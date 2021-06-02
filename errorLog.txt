@@ -1,0 +1,5 @@
+java.lang.NullPointerException: Cannot invoke "com.opencsv.CSVParser.parseLine(String)" because "server.utils.ReadyCSVParser.parser" is null
+	at server.utils.ReadyCSVParser.readKeyLine(ReadyCSVParser.java:41)
+	at server.utils.ReadyCSVParser.readWorkers(ReadyCSVParser.java:144)
+	at commons.app.server.run(commons.app.server.java:67)
+	at commons.app.server.main(commons.app.server.java:31)
