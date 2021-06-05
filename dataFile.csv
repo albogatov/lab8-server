@@ -1,3 +1,3 @@
 id,name,x,y,salary,endDate,creationDate,position,status,organization,orgType,annualTurnover,street,postalCode
-13,Nonsad,12,12,120,null,05/26/2021 - 23:25:48 Z,null,null,,null,null,djfks,123
-12,'oifje',12,12,120,null,05/26/2021 - 23:24:02 Z,null,null,,null,null,sdfsdf,1231
+41,Alex,120,30,1200,2021-06-04,06/05/2021 - 19:37:59 Z,ENGINEER,HIRED,,PRIVATE_LIMITED_COMPANY,1000,Belorusskaya,123456
+40,Sofia,12,12,122,2021-06-03,06/05/2021 - 19:33:13 Z,ENGINEER,HIRED,Hell,PRIVATE_LIMITED_COMPANY,121,Level Seven,122346
