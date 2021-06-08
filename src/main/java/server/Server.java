@@ -5,6 +5,10 @@ import commons.commands.Login;
 import commons.commands.Register;
 import commons.commands.Save;
 import commons.elements.Worker;
+import commons.network.Request;
+import commons.network.Response;
+import commons.network.ResponseCode;
+import commons.network.ResponseData;
 import commons.utils.InteractionInterface;
 import commons.utils.Storage;
 import server.interaction.StorageInteraction;
@@ -66,6 +70,7 @@ public class Server implements Runnable, ConnectionSource {
             CommandCenter.setClientAddress(clientAddress);
             int clientPort = inCommand.getPort();
             CommandCenter.setClientPort(clientPort);
+//            System.out.println("received request");
             return request;
         } catch (IOException e) {
             logger.log(Level.SEVERE, "An I/O Exception has occurred", e);
@@ -75,61 +80,118 @@ public class Server implements Runnable, ConnectionSource {
         }
     }
 
-    public void processRequest(Request request) {
-        String argument;
-        Worker worker;
-        Command cmd = CommandCenter.getInstance().getCmd(request.getCommandName());
-        Response response = new Response();
-        if (cmd.getClass().toString().contains(".Register"))
-            authorisation = authoriseUser(cmd.getUser(), "new");
-        if (cmd.getClass().toString().contains(".Login"))
-            authorisation = authoriseUser(cmd.getUser(), "old");
-        if (authorisation) {
-            if (cmd.getCommand().equals("exit")) {
-                logger.log(Level.INFO, "Collection saving initiated");
-                Command save = new Save();
-                save.setUser(cmd.getUser());
-                CommandCenter.getInstance().executeCommand(userInterface, save, interactiveStorage);
-            } else {
-                try {
-                    if (cmd.getArgumentAmount() == 0) {
-                        logger.log(Level.INFO, "Executing command without arguments");
-                        if (CommandCenter.getInstance().executeCommand(userInterface, cmd, interactiveStorage, dataBaseCenter))
-                            response.setResponseCode(ResponseCode.OK);
-                        else response.setResponseCode(ResponseCode.ERROR);
+    public boolean processRequest(Request request) {
+//        System.out.println("enter process");
+        try {
+            String argument;
+            Worker worker;
+            Command cmd;
+//            System.out.println(request.getCommandName());
+            if (!(request.getCommandName().equals("login") || request.getCommandName().equals("register")))
+                cmd = CommandCenter.getInstance().getCmd(request.getCommandName());
+            else if (request.getCommandName().equals("login")) {
+                cmd = new Login();
+            } else cmd = new Register();
+            cmd.setUser(request.getUser());
+            cmd.setObject((Worker) request.getCommandObjectArgument());
+            cmd.setArgument(request.getCommandStringArgument());
+//            System.out.println("cmd" + cmd);
+            Response response = new Response();
+//            System.out.println("enter processing" + cmd.toString());
+            if (cmd.getClass().toString().contains(".Register")) {
+//                System.out.println("enter register");
+                authorisation = authoriseUser(cmd.getUser(), "new");
+                if (!authorisation) {
+                    response.setResponseCode(ResponseCode.ERROR);
+                } else response.setResponseCode(ResponseCode.OK);
+                response.setResponseBody(ResponseData.getAndClear());
+//                        System.out.println(response.getResponseBody());
+                response.setResponseBodyArgs(ResponseData.getArgsAndClear());
+                response.setWorkers(interactiveStorage.getStorage().getCollection());
+//                System.out.println(response.toString());
+                DatagramPacket responseSender = new DatagramPacket(SerializationTool.serializeObject(response),
+                        SerializationTool.serializeObject(response).length, CommandCenter.getClientAddress(), CommandCenter.getClientPort());
+                datagramSocket.send(responseSender);
+            }
+            if (cmd.getClass().toString().contains(".Login")) {
+//                System.out.println("enter login");
+                authorisation = authoriseUser(cmd.getUser(), "old");
+                if (!authorisation) {
+                    response.setResponseCode(ResponseCode.ERROR);
+                } else response.setResponseCode(ResponseCode.OK);
+                response.setResponseBody(ResponseData.getAndClear());
+//                        System.out.println(response.getResponseBody());
+                response.setResponseBodyArgs(ResponseData.getArgsAndClear());
+                response.setWorkers(interactiveStorage.getStorage().getCollection());
+//                System.out.println(response.toString());
+                DatagramPacket responseSender = new DatagramPacket(SerializationTool.serializeObject(response),
+                        SerializationTool.serializeObject(response).length, CommandCenter.getClientAddress(), CommandCenter.getClientPort());
+                System.out.println("sending");
+                datagramSocket.send(responseSender);
+            }
+            if (authorisation && !cmd.getClass().toString().contains(".Login") && !cmd.getClass().toString().contains(".Register")) {
+                if (cmd.getCommand().equals("exit")) {
+                    logger.log(Level.INFO, "Collection saving initiated");
+                    Command save = new Save();
+                    save.setUser(cmd.getUser());
+                    CommandCenter.getInstance().executeCommand(userInterface, save, interactiveStorage);
+                } else {
+                    try {
+                        if (cmd.getArgumentAmount() == 0) {
+                            logger.log(Level.INFO, "Executing command without arguments");
+                            if (CommandCenter.getInstance().executeCommand(userInterface, cmd, interactiveStorage, dataBaseCenter))
+                                response.setResponseCode(ResponseCode.OK);
+                            else response.setResponseCode(ResponseCode.ERROR);
+                        }
+                        if (cmd.getArgumentAmount() == 1 && !cmd.getNeedsObject()) {
+                            logger.log(Level.INFO, "Executing command with a String argument");
+                            argument = cmd.getArgument();
+                            if (CommandCenter.getInstance().executeCommand(userInterface, cmd, argument, interactiveStorage, dataBaseCenter))
+                                response.setResponseCode(ResponseCode.OK);
+                            else response.setResponseCode(ResponseCode.ERROR);
+                        }
+                        if (cmd.getArgumentAmount() == 1 && cmd.getNeedsObject()) {
+                            logger.log(Level.INFO, "Executing command with an object as an argument");
+                            worker = cmd.getObject();
+                            if (CommandCenter.getInstance().executeCommand(userInterface, cmd, interactiveStorage, worker, dataBaseCenter))
+                                response.setResponseCode(ResponseCode.OK);
+                            else response.setResponseCode(ResponseCode.ERROR);
+                            System.out.println("set response code");
+                        }
+                        if (cmd.getArgumentAmount() == 2 && cmd.getNeedsObject()) {
+                            logger.log(Level.INFO, "Executing command with arguments of various types");
+                            argument = cmd.getArgument();
+                            worker = cmd.getObject();
+                            if (CommandCenter.getInstance().executeCommand(userInterface, cmd, argument, interactiveStorage, worker, dataBaseCenter))
+                                response.setResponseCode(ResponseCode.OK);
+                            else response.setResponseCode(ResponseCode.ERROR);
+                        }
+                        System.out.println("exited execution");
+                        response.setResponseBody(ResponseData.getAndClear());
+//                        System.out.println(response.getResponseBody());
+                        response.setResponseBodyArgs(ResponseData.getArgsAndClear());
+                        response.setWorkers(interactiveStorage.getStorage().getCollection());
+//                        System.out.println(interactiveStorage.getStorage().getCollection() + " DATA");
+//                        byte[] testBytes = SerializationTool.serializeObject(response);
+//                        Response test = (Response) new SerializationTool().deserializeObject(testBytes);
+//                        System.out.println(test.getResponseBody() + "test");
+                        DatagramPacket datagramPacket = new DatagramPacket(SerializationTool.serializeObject(response),
+                                SerializationTool.serializeObject(response).length, CommandCenter.getClientAddress(), CommandCenter.getClientPort());
+//                        System.out.println(response.toString() + " RESPONSE");
+                        Thread.sleep(300);
+                        System.out.println("sending " + response.getResponseCode() + response.getResponseBody() + " for " + request.getCommandName());
+                        datagramSocket.send(datagramPacket);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } catch (InterruptedException e) {
+
                     }
-                    if (cmd.getArgumentAmount() == 1 && !cmd.getNeedsObject()) {
-                        logger.log(Level.INFO, "Executing command with a String argument");
-                        argument = cmd.getArgument();
-                        if (CommandCenter.getInstance().executeCommand(userInterface, cmd, argument, interactiveStorage, dataBaseCenter))
-                            response.setResponseCode(ResponseCode.OK);
-                        else response.setResponseCode(ResponseCode.ERROR);
-                    }
-                    if (cmd.getArgumentAmount() == 1 && cmd.getNeedsObject()) {
-                        logger.log(Level.INFO, "Executing command with an object as an argument");
-                        worker = cmd.getObject();
-                        if (CommandCenter.getInstance().executeCommand(userInterface, cmd, interactiveStorage, worker, dataBaseCenter))
-                            response.setResponseCode(ResponseCode.OK);
-                        else response.setResponseCode(ResponseCode.ERROR);
-                    }
-                    if (cmd.getArgumentAmount() == 2 && cmd.getNeedsObject()) {
-                        logger.log(Level.INFO, "Executing command with arguments of various types");
-                        argument = cmd.getArgument();
-                        worker = cmd.getObject();
-                        if (CommandCenter.getInstance().executeCommand(userInterface, cmd, argument, interactiveStorage, worker, dataBaseCenter))
-                            response.setResponseCode(ResponseCode.OK);
-                        else response.setResponseCode(ResponseCode.ERROR);
-                    }
-                    response.setResponseBody(ResponseData.getAndClear());
-                    response.setResponseBodyArgs(ResponseData.getArgsAndClear());
-                    response.setWorkers(interactiveStorage.getStorage().getCollection());
-                    DatagramPacket datagramPacket = new DatagramPacket(SerializationTool.serializeObject(response),
-                            SerializationTool.serializeObject(response).length, CommandCenter.getClientAddress(), CommandCenter.getClientPort());
-                    datagramSocket.send(datagramPacket);
-                } catch (IOException e) {
-                    e.printStackTrace();
                 }
             }
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
         }
     }
 
@@ -167,7 +229,7 @@ public class Server implements Runnable, ConnectionSource {
                 try {
                     datagramSocket.setSoTimeout(600 * 1000);
                     Request request = fixedThreadPool.submit(this::receive).get();
-                    fixedThreadPool.submit(() -> processRequest(request));
+                    boolean success = fixedThreadPool.submit(() -> processRequest(request)).get();
                 } catch (IOException e) {
                     if (e instanceof SocketTimeoutException) {
                         logger.log(Level.SEVERE, "Timeout is reached", e);
