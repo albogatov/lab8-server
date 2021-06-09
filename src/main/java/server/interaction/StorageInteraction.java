@@ -52,9 +52,7 @@ public final class StorageInteraction implements InteractionInterface {
      * @return информация о коллекции.
      */
     public String info() {
-        return "Дата доступа к коллекции: " + storage.getInitializationDate() + "\n" +
-                "Тип коллекции: " + storage.getCollection().getClass() + "\n" +
-                "Размер коллекции: " + storage.getCollection().size();
+        return  storage.getInitializationDate() + "\n" + storage.getCollection().getClass() + "\n" + storage.getCollection().size();
     }
 
     /**

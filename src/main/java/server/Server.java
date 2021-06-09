@@ -81,12 +81,10 @@ public class Server implements Runnable, ConnectionSource {
     }
 
     public boolean processRequest(Request request) {
-//        System.out.println("enter process");
         try {
             String argument;
             Worker worker;
             Command cmd;
-//            System.out.println(request.getCommandName());
             if (!(request.getCommandName().equals("login") || request.getCommandName().equals("register")))
                 cmd = CommandCenter.getInstance().getCmd(request.getCommandName());
             else if (request.getCommandName().equals("login")) {
@@ -95,39 +93,32 @@ public class Server implements Runnable, ConnectionSource {
             cmd.setUser(request.getUser());
             cmd.setObject((Worker) request.getCommandObjectArgument());
             cmd.setArgument(request.getCommandStringArgument());
-//            System.out.println("cmd" + cmd);
             Response response = new Response();
-//            System.out.println("enter processing" + cmd.toString());
             if (cmd.getClass().toString().contains(".Register")) {
-//                System.out.println("enter register");
                 authorisation = authoriseUser(cmd.getUser(), "new");
                 if (!authorisation) {
                     response.setResponseCode(ResponseCode.ERROR);
                 } else response.setResponseCode(ResponseCode.OK);
                 response.setResponseBody(ResponseData.getAndClear());
-//                        System.out.println(response.getResponseBody());
                 response.setResponseBodyArgs(ResponseData.getArgsAndClear());
                 response.setWorkers(interactiveStorage.getStorage().getCollection());
-//                System.out.println(response.toString());
                 DatagramPacket responseSender = new DatagramPacket(SerializationTool.serializeObject(response),
                         SerializationTool.serializeObject(response).length, CommandCenter.getClientAddress(), CommandCenter.getClientPort());
                 datagramSocket.send(responseSender);
             }
             if (cmd.getClass().toString().contains(".Login")) {
-//                System.out.println("enter login");
                 authorisation = authoriseUser(cmd.getUser(), "old");
                 if (!authorisation) {
                     response.setResponseCode(ResponseCode.ERROR);
                 } else response.setResponseCode(ResponseCode.OK);
                 response.setResponseBody(ResponseData.getAndClear());
-//                        System.out.println(response.getResponseBody());
                 response.setResponseBodyArgs(ResponseData.getArgsAndClear());
                 response.setWorkers(interactiveStorage.getStorage().getCollection());
-//                System.out.println(response.toString());
                 DatagramPacket responseSender = new DatagramPacket(SerializationTool.serializeObject(response),
                         SerializationTool.serializeObject(response).length, CommandCenter.getClientAddress(), CommandCenter.getClientPort());
-                System.out.println("sending");
                 datagramSocket.send(responseSender);
+            } else {
+                authorisation = true;
             }
             if (authorisation && !cmd.getClass().toString().contains(".Login") && !cmd.getClass().toString().contains(".Register")) {
                 if (cmd.getCommand().equals("exit")) {
@@ -156,7 +147,6 @@ public class Server implements Runnable, ConnectionSource {
                             if (CommandCenter.getInstance().executeCommand(userInterface, cmd, interactiveStorage, worker, dataBaseCenter))
                                 response.setResponseCode(ResponseCode.OK);
                             else response.setResponseCode(ResponseCode.ERROR);
-                            System.out.println("set response code");
                         }
                         if (cmd.getArgumentAmount() == 2 && cmd.getNeedsObject()) {
                             logger.log(Level.INFO, "Executing command with arguments of various types");
@@ -166,25 +156,17 @@ public class Server implements Runnable, ConnectionSource {
                                 response.setResponseCode(ResponseCode.OK);
                             else response.setResponseCode(ResponseCode.ERROR);
                         }
-                        System.out.println("exited execution");
                         response.setResponseBody(ResponseData.getAndClear());
-//                        System.out.println(response.getResponseBody());
                         response.setResponseBodyArgs(ResponseData.getArgsAndClear());
                         response.setWorkers(interactiveStorage.getStorage().getCollection());
-//                        System.out.println(interactiveStorage.getStorage().getCollection() + " DATA");
-//                        byte[] testBytes = SerializationTool.serializeObject(response);
-//                        Response test = (Response) new SerializationTool().deserializeObject(testBytes);
-//                        System.out.println(test.getResponseBody() + "test");
                         DatagramPacket datagramPacket = new DatagramPacket(SerializationTool.serializeObject(response),
                                 SerializationTool.serializeObject(response).length, CommandCenter.getClientAddress(), CommandCenter.getClientPort());
-//                        System.out.println(response.toString() + " RESPONSE");
                         Thread.sleep(300);
-                        System.out.println("sending " + response.getResponseCode() + response.getResponseBody() + " for " + request.getCommandName());
                         datagramSocket.send(datagramPacket);
                     } catch (IOException e) {
                         e.printStackTrace();
                     } catch (InterruptedException e) {
-
+                        e.printStackTrace();
                     }
                 }
             }
