@@ -39,6 +39,7 @@ public class Server implements Runnable, ConnectionSource {
     private final Storage storage = new Storage();
     private InteractionInterface interactiveStorage = null;
     private final ExecutorService fixedThreadPool = Executors.newFixedThreadPool(10);
+    private boolean updateNeed = false;
 
     public static void main(String[] args) {
         logger.log(Level.INFO, "commons.app.server operation initiated");
@@ -105,6 +106,7 @@ public class Server implements Runnable, ConnectionSource {
                 DatagramPacket responseSender = new DatagramPacket(SerializationTool.serializeObject(response),
                         SerializationTool.serializeObject(response).length, CommandCenter.getClientAddress(), CommandCenter.getClientPort());
                 datagramSocket.send(responseSender);
+                updateNeed = true;
             }
             if (cmd.getClass().toString().contains(".Login")) {
                 authorisation = authoriseUser(cmd.getUser(), "old");
@@ -117,24 +119,60 @@ public class Server implements Runnable, ConnectionSource {
                 DatagramPacket responseSender = new DatagramPacket(SerializationTool.serializeObject(response),
                         SerializationTool.serializeObject(response).length, CommandCenter.getClientAddress(), CommandCenter.getClientPort());
                 datagramSocket.send(responseSender);
+                updateNeed = true;
             } else {
                 authorisation = true;
             }
             if (authorisation && !cmd.getClass().toString().contains(".Login") && !cmd.getClass().toString().contains(".Register")) {
-                if (cmd.getCommand().equals("exit")) {
-                    logger.log(Level.INFO, "Collection saving initiated");
-                    Command save = new Save();
-                    save.setUser(cmd.getUser());
-                    CommandCenter.getInstance().executeCommand(userInterface, save, interactiveStorage);
+                if (request.getCommandName().equals("show")) {
+                    logger.log(Level.INFO, "Update requested");
+//                    Command save = new Save();
+//                    save.setUser(cmd.getUser());
+//                    CommandCenter.getInstance().executeCommand(userInterface, save, interactiveStorage);
+                    if (updateNeed) {
+                        try {
+                            logger.log(Level.INFO, "Executing command without arguments");
+                            if (CommandCenter.getInstance().executeCommand(userInterface, cmd, interactiveStorage, dataBaseCenter))
+                                response.setResponseCode(ResponseCode.OK);
+                            else response.setResponseCode(ResponseCode.ERROR);
+                            response.setResponseBody(ResponseData.getAndClear());
+                            response.setResponseBodyArgs(ResponseData.getArgsAndClear());
+                            response.setWorkers(interactiveStorage.getStorage().getCollection());
+                            DatagramPacket datagramPacket = new DatagramPacket(SerializationTool.serializeObject(response),
+                                    SerializationTool.serializeObject(response).length, CommandCenter.getClientAddress(), CommandCenter.getClientPort());
+                            Thread.sleep(300);
+                            datagramSocket.send(datagramPacket);
+                            updateNeed = false;
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    } else {
+                        try {
+                            response.setResponseBody("NotNeeded");
+                            response.setResponseBodyArgs(null);
+                            response.setWorkers(interactiveStorage.getStorage().getCollection());
+                            DatagramPacket datagramPacket = new DatagramPacket(SerializationTool.serializeObject(response),
+                                    SerializationTool.serializeObject(response).length, CommandCenter.getClientAddress(), CommandCenter.getClientPort());
+                            Thread.sleep(300);
+                            datagramSocket.send(datagramPacket);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
                 } else {
                     try {
+                        updateNeed = true;
                         if (cmd.getArgumentAmount() == 0) {
                             logger.log(Level.INFO, "Executing command without arguments");
+                            if (request.getCommandName().equals("clear"))
+                                updateNeed = true;
                             if (CommandCenter.getInstance().executeCommand(userInterface, cmd, interactiveStorage, dataBaseCenter))
                                 response.setResponseCode(ResponseCode.OK);
                             else response.setResponseCode(ResponseCode.ERROR);
                         }
                         if (cmd.getArgumentAmount() == 1 && !cmd.getNeedsObject()) {
+                            if (request.getCommandName().equals("remove_by_id"))
+                                updateNeed = true;
                             logger.log(Level.INFO, "Executing command with a String argument");
                             argument = cmd.getArgument();
                             if (CommandCenter.getInstance().executeCommand(userInterface, cmd, argument, interactiveStorage, dataBaseCenter))
@@ -142,6 +180,7 @@ public class Server implements Runnable, ConnectionSource {
                             else response.setResponseCode(ResponseCode.ERROR);
                         }
                         if (cmd.getArgumentAmount() == 1 && cmd.getNeedsObject()) {
+                            updateNeed = true;
                             logger.log(Level.INFO, "Executing command with an object as an argument");
                             worker = cmd.getObject();
                             if (CommandCenter.getInstance().executeCommand(userInterface, cmd, interactiveStorage, worker, dataBaseCenter))
@@ -149,6 +188,7 @@ public class Server implements Runnable, ConnectionSource {
                             else response.setResponseCode(ResponseCode.ERROR);
                         }
                         if (cmd.getArgumentAmount() == 2 && cmd.getNeedsObject()) {
+                            updateNeed = true;
                             logger.log(Level.INFO, "Executing command with arguments of various types");
                             argument = cmd.getArgument();
                             worker = cmd.getObject();
