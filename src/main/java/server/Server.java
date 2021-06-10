@@ -38,7 +38,6 @@ public class Server implements Runnable, ConnectionSource {
     private final int port = 7855;
     private final Storage storage = new Storage();
     private InteractionInterface interactiveStorage = null;
-    private boolean authorisation = false;
     private final ExecutorService fixedThreadPool = Executors.newFixedThreadPool(10);
 
     public static void main(String[] args) {
@@ -94,6 +93,7 @@ public class Server implements Runnable, ConnectionSource {
             cmd.setObject((Worker) request.getCommandObjectArgument());
             cmd.setArgument(request.getCommandStringArgument());
             Response response = new Response();
+            boolean authorisation = false;
             if (cmd.getClass().toString().contains(".Register")) {
                 authorisation = authoriseUser(cmd.getUser(), "new");
                 if (!authorisation) {
